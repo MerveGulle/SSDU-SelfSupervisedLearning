@@ -76,9 +76,12 @@ class KneeDataset():
         
         self.mask_list = (self.mask[0]==1).nonzero(as_tuple=False)
         
+        self.kspace = self.kspace*self.mask[None,:,:,None]
         self.x0   = torch.empty(self.kspace.shape[0:3], dtype=torch.cfloat)
+        self.xref = torch.empty(self.kspace.shape[0:3], dtype=torch.cfloat)
         self.R    = 1/(torch.abs(self.mask).sum()/(self.kspace.shape[1]*self.kspace.shape[2]))
         self.mask_loss = torch.zeros(self.kspace.shape[0:3], dtype=torch.cfloat)
+        self.mask_train = torch.zeros(self.kspace.shape[0:3], dtype=torch.cfloat)
         
         for i in range(self.kspace.shape[0]):
             self.mask_loss_list = random.sample(list((self.mask[0]==1).nonzero(as_tuple=False)),
@@ -90,9 +93,12 @@ class KneeDataset():
             self.kspace[i] = self.kspace[i:i+1]/torch.max(torch.abs(self.kspace[i:i+1]))
             
             self.x0[i] = decode(self.kspace[i:i+1]*self.mask_train[i][None,:,:,None],self.sens_map[i:i+1])
-
+            
+            self.xref[i] = decode(self.kspace[i:i+1],self.sens_map[i:i+1])
+     
+            
     def __getitem__(self,index):
-        return self.x0[index], self.kspace[index], self.mask_loss[index], self.mask_train[index], self.sens_map[index], index
+        return self.x0[index], self.xref[index], self.kspace[index], self.mask_loss[index], self.mask_train[index], self.sens_map[index], index
     def __len__(self):
         return self.n_slices   
 
