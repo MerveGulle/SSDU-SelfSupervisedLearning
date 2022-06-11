@@ -58,8 +58,8 @@ def nmse(x,xref):
 class KneeDataset():
     def __init__(self,data_path,coil_path,R,num_slice,loss_train_loss=0.4,num_ACS=24):
         f = h5py.File(data_path, "r")
-        start_slice = 0
-        r = 1
+        start_slice = 10
+        r = 40
         self.kspace    = f['kspace'][start_slice:start_slice+num_slice*r:r]
         self.kspace    = torch.from_numpy(self.kspace)
         
@@ -74,7 +74,7 @@ class KneeDataset():
         self.mask[:,::R] = 1.0
         self.mask[:,(self.kspace.shape[2]-num_ACS)//2:(self.kspace.shape[2]+num_ACS)//2] = 1.0
         
-        self.mask_list = (self.mask[0]==1).nonzero(as_tuple=False)
+        self.gauss_kernel = gauss_gen(self.mask.shape[1], self.mask.shape[0], sigma=0.5)
         
         self.kspace = self.kspace*self.mask[None,:,:,None]
         self.x0   = torch.empty(self.kspace.shape[0:3], dtype=torch.cfloat)
@@ -84,9 +84,10 @@ class KneeDataset():
         self.mask_train = torch.zeros(self.kspace.shape[0:3], dtype=torch.cfloat)
         
         for i in range(self.kspace.shape[0]):
-            self.mask_loss_list = random.sample(list((self.mask[0]==1).nonzero(as_tuple=False)),
-                                                int(torch.abs(torch.sum(self.mask[0]))*loss_train_loss))
-            self.mask_loss[i,:,self.mask_loss_list] = 1.0
+            self.random = torch.rand((self.kspace.shape[1],self.kspace.shape[2]))
+            # 0.385 --> mask_loss / mask = 0.4
+            self.gauss_mask = (self.random * self.gauss_kernel) > 0.385
+            self.mask_loss[i] = self.gauss_mask * self.mask
             
             self.mask_train[i] = self.mask - self.mask_loss[i]
             
@@ -101,6 +102,17 @@ class KneeDataset():
         return self.x0[index], self.xref[index], self.kspace[index], self.mask_loss[index], self.mask_train[index], self.sens_map[index], index
     def __len__(self):
         return self.n_slices   
+
+
+# Gaussian kernel generator
+def gauss_gen(Nx, Ny, sigma):
+    xs = torch.linspace(-1, 1, steps=Nx)
+    ys = torch.linspace(-1, 1, steps=Ny)
+    x, y = torch.meshgrid(xs, ys, indexing='xy')
+    z = (x*x + y*y)/(2*sigma)
+    z = 1 - z / torch.max(z)
+    return z
+
 
 # complex 1 channel to real 2 channels
 def ch1to2(data1):       

@@ -17,7 +17,7 @@ params = dict([('num_epoch', 200),
                ('save_flag', False),
                ('use_cpu', False),
                ('acc_rate', 4),
-               ('K', 10)])   
+               ('K', 2)])   
 
 ### PATHS          
 train_data_path  = 'Knee_Coronal_PD_RawData_300Slices_Train.h5'
@@ -36,14 +36,14 @@ g.manual_seed(0)
 device = torch.device('cuda' if (torch.cuda.is_available() and (not(params['use_cpu']))) else 'cpu')
 
 # 2) Load Data
-dataset = sf.KneeDataset(train_data_path,train_coil_path, params['acc_rate'], num_slice=300)
+dataset = sf.KneeDataset(train_data_path,train_coil_path, params['acc_rate'], num_slice=5)
 loaders, datasets= sf.prepare_train_loaders(dataset,params,g)
 mask = dataset.mask.to(device)
 
 # 3) Create Model structure
 denoiser = model.ResNet().to(device)
 optimizer = torch.optim.Adam(denoiser.parameters(),lr=params['learning_rate'])
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.9)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.9)
 
 loss_arr       = np.zeros(params['num_epoch'])
 loss_arr_valid = np.zeros(params['num_epoch'])
@@ -59,7 +59,7 @@ for epoch in range(params['num_epoch']):
         xk = x0
         for k in range(params['K']):
             L, zk = denoiser(xk)
-            xk = model.DC_layer(x0,zk,L,sens_map,mask)
+            xk = model.DC_layer(x0,zk,L,sens_map,mask_train[0])
         ksp_loss = sf.encode(xk,sens_map,mask_loss[0])
         
         optimizer.zero_grad()
@@ -88,16 +88,16 @@ for epoch in range(params['num_epoch']):
     
     for i, (x0, xref, kspace, mask_loss, mask_train, sens_map, index) in enumerate(loaders['valid_loader']):
         with torch.no_grad():
-            x0      = x0.to(device)
+            x0     = x0.to(device)
             kspace = kspace.to(device)
             mask_loss = mask_loss.to(device)
             mask_train = mask_train.to(device)
-            sens_map    = sens_map.to(device)
+            sens_map   = sens_map.to(device)
             # Forward pass
             xk = x0
             for k in range(params['K']):
                 L, zk = denoiser(xk)
-                xk = model.DC_layer(x0,zk,L,sens_map,mask)
+                xk = model.DC_layer(x0,zk,L,sens_map,mask_train[0])
             ksp_loss = sf.encode(xk,sens_map,mask_loss[0])
             
             loss = sf.L1L2Loss(kspace*mask_loss[:,:,:,None], ksp_loss)
@@ -107,8 +107,8 @@ for epoch in range(params['num_epoch']):
     
     print ('-----------------------------')
     print (f'Epoch [{epoch+1}/{params["num_epoch"]}], \
-           Loss training: {loss_arr[epoch]:.4f}, \
-           Loss validation: {loss_arr_valid[epoch]:.4f}')
+           Loss training: {loss_arr[epoch]:.6f}, \
+           Loss validation: {loss_arr_valid[epoch]:.6f}')
     print ('-----------------------------')
 
 figure = plt.figure()
