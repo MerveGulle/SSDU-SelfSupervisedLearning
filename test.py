@@ -46,12 +46,12 @@ mask = dataset.mask.to(device)
 ############## TEST CODE ###########################
 ####################################################
 denoiser = model.ResNet().to(device)
-denoiser.load_state_dict(torch.load('model_t__SSDU_060.pt'))
+denoiser.load_state_dict(torch.load('model_t__SSDU_100.pt'))
 denoiser.eval()
-for i, (x0, xref, kspace_loss, mask_loss, mask_train, sens_map, index) in enumerate(loaders['test_loader']):
+for i, (x0, kspace_loss, mask_loss, mask_train, sens_map, index) in enumerate(loaders['test_loader']):
     with torch.no_grad():
         x0          = x0.to(device)
-        xref        = xref.to(device)
+        #xref        = xref.to(device)
         kspace_loss = kspace_loss.to(device)
         mask_loss = mask_loss.to(device)
         mask_train = mask_train.to(device)
@@ -60,16 +60,16 @@ for i, (x0, xref, kspace_loss, mask_loss, mask_train, sens_map, index) in enumer
         xk = x0
         for k in range(params['K']):
             L, zk = denoiser(xk)
-            xk = model.DC_layer(x0,zk,L,sens_map,mask)
+            xk = model.DC_layer(x0,zk/4,L,sens_map,mask)
         ksp_loss = sf.encode(xk,sens_map,mask_loss[0])
             
         xc = model.DC_layer(x0,x0,0,sens_map,mask)
         
-        xref = np.abs(xref.cpu().detach().numpy()[0,:,:])
+        #xref = np.abs(xref.cpu().detach().numpy()[0,:,:])
         x0 = np.abs(x0.cpu().detach().numpy()[0,:,:])
         xc = np.abs(xc.cpu().detach().numpy()[0,:,:])
         xk = np.abs(xk.cpu().detach().numpy()[0,:,:])
-        
+        '''
         data_range=xref.max() - xref.min()
         ssim_0 = ssim(xref, x0, data_range=data_range)
         ssim_c = ssim(xref, xc, data_range=data_range)
@@ -78,13 +78,13 @@ for i, (x0, xref, kspace_loss, mask_loss, mask_train, sens_map, index) in enumer
         nmse_0 = sf.nmse(x0,xref)
         nmse_k = sf.nmse(xk,xref)
         nmse_c = sf.nmse(xc,xref)
-        
+        '''
         figure = plt.figure()
         plt.imshow(x0,cmap='gray')
         plt.title(f'zero_filled_slice:{index.item():03d}')
         ax = plt.gca()
-        label = ax.set_xlabel('NMSE:'+f'{nmse_0:,.3f}'+'\n'+
-                              'SSIM:'+f'{ssim_0:,.3f}', fontsize = 12)
+        #label = ax.set_xlabel('NMSE:'+f'{nmse_0:,.3f}'+'\n'+
+        #                      'SSIM:'+f'{ssim_0:,.3f}', fontsize = 12)
         ax.xaxis.set_label_coords(0.17, 0.13)
         ax.xaxis.label.set_color('white')
         ax.set_yticklabels([])
@@ -96,8 +96,8 @@ for i, (x0, xref, kspace_loss, mask_loss, mask_train, sens_map, index) in enumer
         plt.imshow(xc,cmap='gray')
         plt.title(f'CG-SENSE_slice:{index.item():03d}')
         ax = plt.gca()
-        label = ax.set_xlabel('NMSE:'+f'{nmse_c:,.3f}'+'\n'+
-                              'SSIM:'+f'{ssim_c:,.3f}', fontsize = 12)
+        #label = ax.set_xlabel('NMSE:'+f'{nmse_c:,.3f}'+'\n'+
+        #                      'SSIM:'+f'{ssim_c:,.3f}', fontsize = 12)
         ax.xaxis.set_label_coords(0.17, 0.13)
         ax.xaxis.label.set_color('white')
         ax.set_yticklabels([])
@@ -109,15 +109,15 @@ for i, (x0, xref, kspace_loss, mask_loss, mask_train, sens_map, index) in enumer
         plt.imshow(xk,cmap='gray')
         plt.title(f'SSDU_slice:{index.item():03d}')
         ax = plt.gca()
-        label = ax.set_xlabel('NMSE:'+f'{nmse_k:,.3f}'+'\n'+
-                              'SSIM:'+f'{ssim_k:,.3f}', fontsize = 12)
+        #label = ax.set_xlabel('NMSE:'+f'{nmse_k:,.3f}'+'\n'+
+        #                      'SSIM:'+f'{ssim_k:,.3f}', fontsize = 12)
         ax.xaxis.set_label_coords(0.17, 0.13)
         ax.xaxis.label.set_color('white')
         ax.set_yticklabels([])
         ax.set_xticklabels([])
         #plt.show()
         figure.savefig('x_SSDU'+f'_{i:03d}'+'.png') 
-        
+        '''
         figure = plt.figure()
         plt.imshow(xref,cmap='gray')
         plt.title(f'reference_slice:{index.item():03d}')
@@ -126,4 +126,4 @@ for i, (x0, xref, kspace_loss, mask_loss, mask_train, sens_map, index) in enumer
         ax.set_xticklabels([])
         #plt.show()
         figure.savefig('xref'+f'_{i:03d}'+'.png')  
-
+        '''
