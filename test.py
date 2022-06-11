@@ -6,6 +6,7 @@ from matplotlib import pyplot as plt
 import SupportingFunctions as sf
 import os
 from skimage.metrics import structural_similarity as ssim
+
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
 print('Test code has been started.')
@@ -46,7 +47,7 @@ mask = dataset.mask.to(device)
 ############## TEST CODE ###########################
 ####################################################
 denoiser = model.ResNet().to(device)
-denoiser.load_state_dict(torch.load('model_t__SSDU_100.pt'))
+denoiser.load_state_dict(torch.load('model_t__SSDU_030.pt'))
 denoiser.eval()
 for i, (x0, kspace_loss, mask_loss, mask_train, sens_map, index) in enumerate(loaders['test_loader']):
     with torch.no_grad():
