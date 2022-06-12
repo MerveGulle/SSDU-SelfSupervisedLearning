@@ -58,8 +58,8 @@ def nmse(x,xref):
 class KneeDataset():
     def __init__(self,data_path,coil_path,R,num_slice,loss_train_loss=0.4,num_ACS=24):
         f = h5py.File(data_path, "r")
-        start_slice = 10
-        r = 40
+        start_slice = 0
+        r = 1
         self.kspace    = f['kspace'][start_slice:start_slice+num_slice*r:r]
         self.kspace    = torch.from_numpy(self.kspace)
         
@@ -74,7 +74,7 @@ class KneeDataset():
         self.mask[:,::R] = 1.0
         self.mask[:,(self.kspace.shape[2]-num_ACS)//2:(self.kspace.shape[2]+num_ACS)//2] = 1.0
         
-        self.gauss_kernel = gauss_gen(self.mask.shape[0], self.mask.shape[1], sigma=0.5)
+        self.gauss_kernel = gauss_gen(self.mask.shape[0], self.mask.shape[1], sigma=1.0)
         
         self.kspace = self.kspace*self.mask[None,:,:,None]
         self.x0   = torch.empty(self.kspace.shape[0:3], dtype=torch.cfloat)
@@ -85,16 +85,23 @@ class KneeDataset():
         
         for i in range(self.kspace.shape[0]):
             self.random = torch.rand((self.kspace.shape[1],self.kspace.shape[2]))
-            # 0.385 --> mask_loss / mask = 0.4
-            self.gauss_mask = (self.random * self.gauss_kernel) > 0.5
+            # 0.43 --> mask_loss / mask = 0.4
+            self.gauss_mask = (self.random * self.gauss_kernel) > 0.43
             self.mask_loss[i] = self.gauss_mask * self.mask
             self.mask_loss[i,158:162,182:186] = 0.0 #4x4 small ACS area
             
             self.mask_train[i] = self.mask - self.mask_loss[i]
             
-            self.kspace[i] = self.kspace[i:i+1]/torch.max(torch.abs(self.kspace[i:i+1]))
+            #self.kspace[i] = self.kspace[i:i+1]/torch.max(torch.abs(self.kspace[i:i+1]))
+            
+            #self.x0[i] = decode(self.kspace[i:i+1]*self.mask_train[i][None,:,:,None],self.sens_map[i:i+1])
             
             self.x0[i] = decode(self.kspace[i:i+1]*self.mask_train[i][None,:,:,None],self.sens_map[i:i+1])
+            scale = torch.max(torch.abs(self.x0[i]))
+            self.x0[i] = self.x0[i]/scale
+            
+            self.kspace[i] = self.kspace[i:i+1]/scale
+            
             
     def __getitem__(self,index):
         return self.x0[index], self.kspace[index], self.mask_loss[index], self.mask_train[index], self.sens_map[index], index
@@ -108,7 +115,8 @@ def gauss_gen(Nx, Ny, sigma):
     ys = torch.linspace(-1, 1, steps=Ny)
     x, y = torch.meshgrid(xs, ys)
     z = (x*x + y*y)/(2*sigma)
-    z = 1 - z / torch.max(z)
+    z = torch.exp(-z)
+    z = z / torch.max(z)
     return z
 
 
