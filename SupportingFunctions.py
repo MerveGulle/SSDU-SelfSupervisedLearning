@@ -58,8 +58,8 @@ def nmse(x,xref):
 class KneeDataset():
     def __init__(self,data_path,coil_path,R,num_slice,loss_train_loss=0.4,num_ACS=24):
         f = h5py.File(data_path, "r")
-        start_slice = 0
-        r = 1
+        start_slice = 10
+        r = 40
         self.kspace    = f['kspace'][start_slice:start_slice+num_slice*r:r]
         self.kspace    = torch.from_numpy(self.kspace)
         
@@ -88,7 +88,7 @@ class KneeDataset():
             # 0.385 --> mask_loss / mask = 0.4
             self.gauss_mask = (self.random * self.gauss_kernel) > 0.5
             self.mask_loss[i] = self.gauss_mask * self.mask
-            self.mask_loss[i,155:165,179:189] = 0.0
+            self.mask_loss[i,158:162,182:186] = 0.0 #4x4 small ACS area
             
             self.mask_train[i] = self.mask - self.mask_loss[i]
             

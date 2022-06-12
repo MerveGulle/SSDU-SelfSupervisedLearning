@@ -8,8 +8,8 @@ class RB(nn.Module):
     def __init__(self, C=0.1):
         super().__init__()
         self.conv = nn.Conv2d(64, 64, kernel_size=3, padding=1)
-        self.relu  = nn.ReLU()
-        self.C     = C
+        self.relu = nn.ReLU()
+        self.C    = C
     def forward(self, x):
         y = self.conv(x)
         y = self.relu(y)
