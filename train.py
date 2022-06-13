@@ -1,4 +1,4 @@
-import model_shared_weights as model
+import model
 import numpy as np
 import torch
 import random
@@ -43,14 +43,15 @@ mask = dataset.mask.to(device)
 # 3) Create Model structure
 denoiser = model.ResNet().to(device)
 optimizer = torch.optim.Adam(denoiser.parameters(),lr=params['learning_rate'])
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.9)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=2, gamma=0.95)
 
 loss_arr       = np.zeros(params['num_epoch'])
 loss_arr_valid = np.zeros(params['num_epoch'])
 
 for epoch in range(params['num_epoch']):
-    for i, (x0, kspace, mask_loss, mask_train, sens_map, index) in enumerate(loaders['train_loader']):
+    for i, (x0, kspace, mask_loss, mask_train, sens_map, xref, index) in enumerate(loaders['train_loader']):
         x0      = x0.to(device)
+        xref    = xref.to(device)
         kspace = kspace.to(device)
         mask_loss = mask_loss.to(device)
         mask_train = mask_train.to(device)
@@ -77,6 +78,13 @@ for epoch in range(params['num_epoch']):
             print ('-----------------------------')
             torch.save(loss_arr, 'train_loss.pt')
             torch.save(loss_arr_valid, 'valid_loss.pt')
+            figure = plt.figure()
+            n = np.arange(1,params['num_epoch']+1)
+            plt.plot(n,loss_arr,n,loss_arr_valid)
+            plt.xlabel('epoch')
+            plt.title('Loss Graph')
+            plt.legend(['train loss', 'validation loss'])
+            figure.savefig('loss_graph.png')
             sys.exit()
             
         loss_arr[epoch] += loss.item()/len(datasets['train_dataset'])
@@ -85,12 +93,22 @@ for epoch in range(params['num_epoch']):
         # Optimize
         optimizer.step()
         
-        if ((epoch+1)%10==0):
+        if ((epoch+1)%5==0):
           torch.save(denoiser.state_dict(), 'model_t_' + f'_SSDU_{epoch+1:03d}'+ '.pt')
+          torch.save(loss_arr, 'train_loss.pt')
+          torch.save(loss_arr_valid, 'valid_loss.pt')
+          figure = plt.figure()
+          n = np.arange(1,params['num_epoch']+1)
+          plt.plot(n,loss_arr,n,loss_arr_valid)
+          plt.xlabel('epoch')
+          plt.title('Loss Graph')
+          plt.legend(['train loss', 'validation loss'])
+          figure.savefig('loss_graph.png')
     
-    for i, (x0, kspace, mask_loss, mask_train, sens_map, index) in enumerate(loaders['valid_loader']):
+    for i, (x0, kspace, mask_loss, mask_train, sens_map, xref, index) in enumerate(loaders['valid_loader']):
         with torch.no_grad():
             x0     = x0.to(device)
+            xref    = xref.to(device)
             kspace = kspace.to(device)
             mask_loss = mask_loss.to(device)
             mask_train = mask_train.to(device)
