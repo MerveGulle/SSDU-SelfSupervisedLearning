@@ -36,14 +36,14 @@ g.manual_seed(0)
 device = torch.device('cuda' if (torch.cuda.is_available() and (not(params['use_cpu']))) else 'cpu')
 
 # 2) Load Data
-dataset = sf.KneeDatasetTrain(train_data_path,train_coil_path, params['acc_rate'], num_slice=5)
+dataset = sf.KneeDatasetTrain(train_data_path,train_coil_path, params['acc_rate'], num_slice=300)
 loaders, datasets= sf.prepare_train_loaders(dataset,params,g)
 mask = dataset.mask.to(device)
 
 # 3) Create Model structure
 denoiser = model.ResNet().to(device)
 optimizer = torch.optim.Adam(denoiser.parameters(),lr=params['learning_rate'])
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=2, gamma=0.95)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.9)
 
 loss_arr       = np.zeros(params['num_epoch'])
 loss_arr_valid = np.zeros(params['num_epoch'])
@@ -139,3 +139,29 @@ figure.savefig('loss_graph.png')
 
 torch.save(loss_arr, 'train_loss.pt')
 torch.save(loss_arr_valid, 'valid_loss.pt')
+
+'''
+figure = plt.figure(figsize = (30,10))
+plt.subplot(1, 3, 1)
+plt.imshow(np.abs(mask.detach().cpu().numpy()), cmap="gray")
+plt.title("Mask, R=4", fontsize=30)
+ax = plt.gca()
+ax.set_yticklabels([])
+ax.set_xticklabels([])
+
+plt.subplot(1, 3, 2)
+plt.imshow(np.abs(mask_loss[0].detach().cpu().numpy()), cmap="gray")
+plt.title("Loss Mask", fontsize=30)
+ax = plt.gca()
+ax.set_yticklabels([])
+ax.set_xticklabels([])
+
+plt.subplot(1, 3, 3)
+plt.imshow(np.abs(mask_train[0].detach().cpu().numpy()), cmap="gray")
+plt.title("Train Mask", fontsize=30)
+ax = plt.gca()
+ax.set_yticklabels([])
+ax.set_xticklabels([])
+    
+figure.savefig('masks.png')  
+'''

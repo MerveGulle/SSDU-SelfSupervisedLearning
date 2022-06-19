@@ -127,28 +127,3 @@ for i, (x0, kspace, sens_map, xref, index) in enumerate(loaders['test_loader']):
         #plt.show()
         figure.savefig('xref'+f'_{i:03d}'+'.png')  
 
-'''
-figure = plt.figure(figsize = (30,10))
-plt.subplot(1, 3, 1)
-plt.imshow(np.abs(mask.detach().cpu().numpy()), cmap="gray")
-plt.title("Mask, R=4", fontsize=30)
-ax = plt.gca()
-ax.set_yticklabels([])
-ax.set_xticklabels([])
-
-plt.subplot(1, 3, 2)
-plt.imshow(np.abs(mask_loss[0].detach().cpu().numpy()), cmap="gray")
-plt.title("Loss Mask", fontsize=30)
-ax = plt.gca()
-ax.set_yticklabels([])
-ax.set_xticklabels([])
-
-plt.subplot(1, 3, 3)
-plt.imshow(np.abs(mask_train[0].detach().cpu().numpy()), cmap="gray")
-plt.title("Train Mask", fontsize=30)
-ax = plt.gca()
-ax.set_yticklabels([])
-ax.set_xticklabels([])
-    
-figure.savefig('masks.png')  
-'''

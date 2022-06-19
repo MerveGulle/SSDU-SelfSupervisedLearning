@@ -49,7 +49,7 @@ class KneeDatasetTrain():
         self.mask[:,::R] = 1.0
         self.mask[:,(self.kspace.shape[2]-num_ACS)//2:(self.kspace.shape[2]+num_ACS)//2] = 1.0
         
-        self.gauss_kernel = gauss_gen(self.mask.shape[0], self.mask.shape[1], sigma=1.0)
+        self.gauss_kernel = gauss_gen(self.mask.shape[0], self.mask.shape[1], sigma=0.25)
         
         #self.kspace = self.kspace*self.mask[None,:,:,None]
         self.x0   = torch.empty(self.kspace.shape[0:3], dtype=torch.cfloat)
@@ -59,8 +59,8 @@ class KneeDatasetTrain():
         
         for i in range(self.kspace.shape[0]):
             self.random = torch.rand((self.kspace.shape[1],self.kspace.shape[2]))
-            # 0.43 --> mask_loss / mask = 0.4
-            self.gauss_mask = (self.random * self.gauss_kernel) > 0.43
+            # 0.173 --> mask_loss / mask = 0.4 for std = 0.25
+            self.gauss_mask = (self.random * self.gauss_kernel) > 0.173
             self.mask_loss[i] = self.gauss_mask * self.mask
             self.mask_loss[i,158:162,182:186] = 0.0 #4x4 small ACS area
             
