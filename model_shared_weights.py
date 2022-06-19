@@ -8,8 +8,8 @@ class RB(nn.Module):
     def __init__(self, C=0.1):
         super().__init__()
         self.conv = nn.Conv2d(64, 64, kernel_size=3, padding=1)
-        self.relu = nn.ReLU()
-        self.C    = C
+        self.relu  = nn.ReLU()
+        self.C     = C
     def forward(self, x):
         y = self.conv(x)
         y = self.relu(y)
@@ -20,28 +20,24 @@ class RB(nn.Module):
 
 # x0  : initial solution
 # zn  : Output of nth denoiser block
-# L   : regularization coefficient
+# L   : regularization coefficient=quadratic relaxation parameter
 # tol : tolerance for breaking the CG iteration
+# (EHE + LI)xn = x0 + L*zn, DC_layer solves xn
 def DC_layer(x0,zn,L,S,mask,tol=0,cg_iter=10):
-    _,Nx,Ny = x0.shape
-    # xn = torch.zeros((Nx, Ny), dtype=torch.cfloat)
-    xn = x0[0,:,:]*0
-    a  = torch.squeeze(x0 + L*zn)
-    p  = a
-    r  = a
+    p = x0[0] + L * zn[0]
+    r_now = torch.clone(p)
+    xn = torch.zeros_like(p)
     for i in np.arange(cg_iter):
-        delta = torch.sum(r*torch.conj(r)).real/torch.sum(a*torch.conj(a)).real
-        if(delta<tol):
-            break
-        else:
-            p1 = p[None,:,:]
-            q  = torch.squeeze(sf.decode(sf.encode(p1,S,mask),S)) + L* p
-            t  = (torch.sum(r*torch.conj(r))/torch.sum(q*torch.conj(p)))
-            xn = xn + t*p 
-            rn = r  - t*q 
-            p  = rn + (torch.sum(rn*torch.conj(rn))/torch.sum(r*torch.conj(r)))*p
-            r  = rn
-            
+        # q = (EHE + LI)p
+        q = sf.decode(sf.encode(p[None,:,:],S,mask),S)[0] + L*p  
+        # rr_pq = r'r/p'q
+        rr_pq = torch.sum(r_now*torch.conj(r_now))/torch.sum(q*torch.conj(p)) 
+        xn = xn + rr_pq * p
+        r_next = r_now - rr_pq * q
+        # p = r_next + r_next'r_next/r_now'r_now
+        p = (r_next + 
+             (torch.sum(r_next*torch.conj(r_next))/torch.sum(r_now*torch.conj(r_now))) * p)
+        r_now = torch.clone(r_next)
     return xn[None,:,:]
 
 # define ResNet Block
@@ -90,3 +86,9 @@ class ResNet(nn.Module):
         z = self.conv3(z)
         z = sf.ch2to1(z[0,:,:,:])
         return self.L, z
+    
+def weights_init_normal(m):
+  if isinstance(m, nn.Conv2d):
+      nn.init.normal_(m.weight.data,mean=0.0,std=0.05)
+      if m.bias is not None:
+          nn.init.constant_(m.bias.data, 0)

@@ -2,60 +2,35 @@ import numpy as np
 import torch
 import h5py
 from torch.utils.data import DataLoader
-import random
 
 ### DEFINE FFT2 AND IFFT2 FUNCTIONS
 # y = FFT(x): FFT of one slice image to kspace: [1 Nx Ny Nc] --> [1 Nx Ny Nc]
-def fft2(img):
-    _, Nx, Ny, Nc = img.shape
-    # fft = torch.zeros((1, Nx, Ny, Nc), dtype=torch.cfloat)
-    fft = img
-    for coil in np.arange(Nc):
-        A               = torch.squeeze(img[0,:,:,coil])
-        A               = torch.fft.ifftshift(A)
-        A               = torch.fft.fft2(A, norm='ortho')
-        fft[0,:,:,coil] = torch.fft.fftshift(A)
-
-    return fft
+def fft2 (image, axis=[1,2]):
+    return torch.fft.fftshift(torch.fft.fftn(torch.fft.ifftshift(image, dim=axis), dim=axis, norm='ortho'), dim=axis)
 
 # x = iFFT(y): iFFT of one slice kspace to image: [1 Nx Ny Nc] --> [1 Nx Ny Nc]
-def ifft2(kspace):
-    _, Nx, Ny, Nc = kspace.shape
-    # ifft = torch.zeros((1, Nx, Ny, Nc), dtype=torch.cfloat)
-    ifft = kspace
-    
-    for coil in np.arange(Nc):
-        A                  = torch.squeeze(kspace[0,:,:,coil])
-        A                  = torch.fft.ifftshift(A)
-        A                  = torch.fft.ifft2(A, norm='ortho')
-        ifft[0,:,:,coil]   = torch.fft.fftshift(A)
-
-    return ifft
+def ifft2 (kspace, axis=[1,2]):
+    return torch.fft.ifftshift(torch.fft.ifftn(torch.fft.fftshift(kspace, dim=axis), dim=axis, norm='ortho'), dim=axis)
 
 # y = Ex: encoding one slice image to kspace: [1 Nx Ny] --> [1 Nx Ny Nc]
 # S: sensitivity map
 def encode(x,S,mask):
-    y = S*x[:,:,:,None]       # sensitivity map element-wise multiplication
-    y = fft2(y)             # Fourier transform
-    y = y*mask[None,:,:,None] # undersampling
-    return y
+    if mask==None:
+        return fft2(S*x[:,:,:,None])
+    else:
+        return fft2(S*x[:,:,:,None])*mask[None,:,:,None]
 
 # y = E'x: reconstruction from kspace to image space: [1 Nx Ny Nc] --> [1 Nx Ny]
 # S: sensitivity map
 def decode(x,S):
-    y = ifft2(x)               # Inverse fourier transform
-    y = y*torch.conj(S)
-    y = y.sum(axis=3)
-    return y 
+    return torch.sum(ifft2(x)*torch.conj(S), axis=3)
 
 # Normalised Mean Square Error (NMSE)
 # gives the nmse between x and xref
 def nmse(x,xref):
-    out1 = np.sum((x-xref)**2)
-    out2 = np.sum((xref)**2)
-    return out1/out2
+    return np.sum((x-xref)**2) / np.sum((xref)**2)
 
-class KneeDataset():
+class KneeDatasetTrain():
     def __init__(self,data_path,coil_path,R,num_slice,loss_train_loss=0.4,num_ACS=24):
         f = h5py.File(data_path, "r")
         start_slice = 0
@@ -78,7 +53,6 @@ class KneeDataset():
         
         #self.kspace = self.kspace*self.mask[None,:,:,None]
         self.x0   = torch.empty(self.kspace.shape[0:3], dtype=torch.cfloat)
-        self.xref = torch.empty(self.kspace.shape[0:3], dtype=torch.cfloat)
         self.R    = 1/(torch.abs(self.mask).sum()/(self.kspace.shape[1]*self.kspace.shape[2]))
         self.mask_loss = torch.zeros(self.kspace.shape[0:3], dtype=torch.cfloat)
         self.mask_train = torch.zeros(self.kspace.shape[0:3], dtype=torch.cfloat)
@@ -92,19 +66,53 @@ class KneeDataset():
             
             self.mask_train[i] = self.mask - self.mask_loss[i]
             
-            self.x0[i] = decode(self.kspace[i:i+1]*self.mask_train[i][None,:,:,None],self.sens_map[i:i+1])
-            scale = torch.max(torch.abs(self.x0[i]))
-            self.x0[i] = self.x0[i]/scale
+            self.kspace[i] = self.kspace[i:i+1]*self.mask[None,:,:,None]
+            scale = torch.max(torch.abs(self.kspace[i]))
+            self.kspace[i] = self.kspace[i] / scale
             
-            self.kspace[i] = self.kspace[i:i+1]/scale
+            self.x0[i] = decode(self.kspace[i:i+1]*self.mask_train[i,:,:,None],self.sens_map[i:i+1])
+            
+    def __getitem__(self,index):
+        return self.x0[index], self.kspace[index], self.mask_loss[index], self.mask_train[index], self.sens_map[index], index
+    def __len__(self):
+        return self.n_slices  
+
+class KneeDatasetTest():
+    def __init__(self,data_path,coil_path,R,num_slice,loss_train_loss=0.4,num_ACS=24):
+        f = h5py.File(data_path, "r")
+        start_slice = 10
+        r = 40
+        self.kspace    = f['kspace'][start_slice:start_slice+num_slice*r:r]
+        self.kspace    = torch.from_numpy(self.kspace)
+        
+        self.n_slices  = self.kspace.shape[0]
+        
+        S = h5py.File(coil_path, "r")
+        _, value = list(S.items())[0]
+        self.sens_map    = value[start_slice:start_slice+num_slice*r:r]
+        self.sens_map    = torch.from_numpy(self.sens_map)
+        
+        self.mask = torch.zeros((self.kspace.shape[1],self.kspace.shape[2]), dtype=torch.cfloat)
+        self.mask[:,::R] = 1.0
+        self.mask[:,(self.kspace.shape[2]-num_ACS)//2:(self.kspace.shape[2]+num_ACS)//2] = 1.0
+        
+        #self.kspace = self.kspace*self.mask[None,:,:,None]
+        self.x0   = torch.empty(self.kspace.shape[0:3], dtype=torch.cfloat)
+        self.xref = torch.empty(self.kspace.shape[0:3], dtype=torch.cfloat)
+        self.R    = 1/(torch.abs(self.mask).sum()/(self.kspace.shape[1]*self.kspace.shape[2]))
+        
+        for i in range(self.kspace.shape[0]):
+            self.kspace[i] = (self.kspace[i:i+1] / 
+                              torch.max(torch.abs(self.kspace[i:i+1]*self.mask[None,:,:,None])))
+            
+            self.x0[i] = decode(self.kspace[i:i+1]*self.mask[None,:,:,None],self.sens_map[i:i+1])
             
             self.xref[i] = decode(self.kspace[i:i+1],self.sens_map[i:i+1])
             
-            
     def __getitem__(self,index):
-        return self.x0[index], self.kspace[index], self.mask_loss[index], self.mask_train[index], self.sens_map[index], self.xref[index], index
+        return self.x0[index], self.kspace[index], self.sens_map[index], self.xref[index], index
     def __len__(self):
-        return self.n_slices   
+        return self.n_slices
 
 
 # Gaussian kernel generator
@@ -180,18 +188,6 @@ def prepare_test_loaders(test_dataset,params):
 
 # Normalised L1-L2 loss calculation
 # loss = normalised L1 loss + normalised L2 loss
-def L1L2Loss(ref, out):
-    diff = ref - out    
-    L1 = torch.sum(torch.abs(diff)) / torch.sum(torch.abs(ref))
-    L2 = (torch.sqrt(torch.sum(torch.real(diff)**2 + torch.imag(diff)**2)) 
-          /torch.sqrt(torch.sum(torch.real(ref)**2 + torch.imag(ref)**2)))
-    loss = L1 + L2
-    return loss
-
-
-
-
-
-
-
+def L1L2Loss(ref, recon):
+    return torch.norm(recon-ref,p=1)/torch.norm(ref,p=1) + torch.norm(recon-ref,p=2)/torch.norm(ref,p=2)
 

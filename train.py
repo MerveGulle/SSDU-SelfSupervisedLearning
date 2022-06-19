@@ -1,4 +1,4 @@
-import model
+import model_shared_weights as model
 import numpy as np
 import torch
 import random
@@ -36,7 +36,7 @@ g.manual_seed(0)
 device = torch.device('cuda' if (torch.cuda.is_available() and (not(params['use_cpu']))) else 'cpu')
 
 # 2) Load Data
-dataset = sf.KneeDataset(train_data_path,train_coil_path, params['acc_rate'], num_slice=300)
+dataset = sf.KneeDatasetTrain(train_data_path,train_coil_path, params['acc_rate'], num_slice=5)
 loaders, datasets= sf.prepare_train_loaders(dataset,params,g)
 mask = dataset.mask.to(device)
 
@@ -49,9 +49,8 @@ loss_arr       = np.zeros(params['num_epoch'])
 loss_arr_valid = np.zeros(params['num_epoch'])
 
 for epoch in range(params['num_epoch']):
-    for i, (x0, kspace, mask_loss, mask_train, sens_map, xref, index) in enumerate(loaders['train_loader']):
+    for i, (x0, kspace, mask_loss, mask_train, sens_map, index) in enumerate(loaders['train_loader']):
         x0      = x0.to(device)
-        xref    = xref.to(device)
         kspace = kspace.to(device)
         mask_loss = mask_loss.to(device)
         mask_train = mask_train.to(device)
@@ -105,10 +104,9 @@ for epoch in range(params['num_epoch']):
           plt.legend(['train loss', 'validation loss'])
           figure.savefig('loss_graph.png')
     
-    for i, (x0, kspace, mask_loss, mask_train, sens_map, xref, index) in enumerate(loaders['valid_loader']):
+    for i, (x0, kspace, mask_loss, mask_train, sens_map, index) in enumerate(loaders['valid_loader']):
         with torch.no_grad():
             x0     = x0.to(device)
-            xref    = xref.to(device)
             kspace = kspace.to(device)
             mask_loss = mask_loss.to(device)
             mask_train = mask_train.to(device)
