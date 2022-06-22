@@ -1,4 +1,4 @@
-import model_shared_weights as model
+import model
 import numpy as np
 import torch
 import random
@@ -69,7 +69,7 @@ for epoch in range(params['num_epoch']):
         loss = sf.L1L2Loss(kspace*mask_loss[:,:,:,None], ksp_loss)
         
         if (torch.isnan(loss)):
-            torch.save(denoiser.state_dict(), 'model_t_' + f'_SSDU_{epoch:03d}'+ '.pt')
+            torch.save(denoiser.state_dict(), 'model_t_' + f'_ResNet_{epoch:03d}'+ '.pt')
             print ('-----------------------------')
             print (f'Epoch [{epoch+1}/{params["num_epoch"]}], \
                    loss: {loss:.08f}, \
@@ -77,13 +77,6 @@ for epoch in range(params['num_epoch']):
             print ('-----------------------------')
             torch.save(loss_arr, 'train_loss.pt')
             torch.save(loss_arr_valid, 'valid_loss.pt')
-            figure = plt.figure()
-            n = np.arange(1,params['num_epoch']+1)
-            plt.plot(n,loss_arr,n,loss_arr_valid)
-            plt.xlabel('epoch')
-            plt.title('Loss Graph')
-            plt.legend(['train loss', 'validation loss'])
-            figure.savefig('loss_graph.png')
             sys.exit()
             
         loss_arr[epoch] += loss.item()/len(datasets['train_dataset'])
@@ -91,19 +84,7 @@ for epoch in range(params['num_epoch']):
         
         # Optimize
         optimizer.step()
-        
-        if ((epoch+1)%5==0):
-          torch.save(denoiser.state_dict(), 'model_t_' + f'_SSDU_{epoch+1:03d}'+ '.pt')
-          torch.save(loss_arr, 'train_loss.pt')
-          torch.save(loss_arr_valid, 'valid_loss.pt')
-          figure = plt.figure()
-          n = np.arange(1,params['num_epoch']+1)
-          plt.plot(n,loss_arr,n,loss_arr_valid)
-          plt.xlabel('epoch')
-          plt.title('Loss Graph')
-          plt.legend(['train loss', 'validation loss'])
-          figure.savefig('loss_graph.png')
-    
+
     for i, (x0, kspace, mask_loss, mask_train, sens_map, index) in enumerate(loaders['valid_loader']):
         with torch.no_grad():
             x0     = x0.to(device)
@@ -120,7 +101,13 @@ for epoch in range(params['num_epoch']):
             
             loss = sf.L1L2Loss(kspace*mask_loss[:,:,:,None], ksp_loss)
             loss_arr_valid[epoch] += loss.item()/len(datasets['valid_dataset'])
-    
+        
+    if ((epoch+1)%5==0):
+        torch.save(denoiser.state_dict(), 'model_t_' + f'_ResNet_{epoch+1:03d}'+ '.pt')
+        torch.save(loss_arr, 'train_loss.pt')
+        torch.save(loss_arr_valid, 'valid_loss.pt')
+        torch.save(L, 'L.pt')
+          
     scheduler.step()
     
     print ('-----------------------------')

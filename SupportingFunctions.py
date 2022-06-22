@@ -141,7 +141,7 @@ def prepare_train_loaders(dataset,params,g):
 
     train_loader = DataLoader(dataset       = train_dataset,
                             batch_size      = params['batch_size'],
-                            shuffle         = False,
+                            shuffle         = True,
                             drop_last       = True,
                             #worker_init_fn  = seed_worker,
                             num_workers     = params['num_workers'],
@@ -149,7 +149,7 @@ def prepare_train_loaders(dataset,params,g):
 
     valid_loader = DataLoader(dataset       = valid_dataset,
                             batch_size      = params['batch_size'],
-                            shuffle         = False,
+                            shuffle         = True,
                             drop_last       = True,
                             #worker_init_fn  = seed_worker,
                             num_workers     = params['num_workers'],
@@ -157,7 +157,7 @@ def prepare_train_loaders(dataset,params,g):
 
     full_loader= DataLoader(dataset         = dataset,
                             batch_size      = params['batch_size'],
-                            shuffle         = False,
+                            shuffle         = True,
                             drop_last       = False,
                             #worker_init_fn  = seed_worker,
                             num_workers     = params['num_workers'],
