@@ -47,6 +47,8 @@ class KneeDatasetTrain():
         
         self.mask = torch.zeros((self.kspace.shape[1],self.kspace.shape[2]), dtype=torch.cfloat)
         self.mask[:,::R] = 1.0
+        self.mask[:,0:18] = 1.0
+        self.mask[:,-18:self.kspace.shape[2]] = 1.0
         self.mask[:,(self.kspace.shape[2]-num_ACS)//2:(self.kspace.shape[2]+num_ACS)//2] = 1.0
         
         self.gauss_kernel = gauss_gen(self.mask.shape[0], self.mask.shape[1], sigma=0.25)
@@ -94,6 +96,8 @@ class KneeDatasetTest():
         
         self.mask = torch.zeros((self.kspace.shape[1],self.kspace.shape[2]), dtype=torch.cfloat)
         self.mask[:,::R] = 1.0
+        self.mask[:,0:18] = 1.0
+        self.mask[:,-18:self.kspace.shape[2]] = 1.0
         self.mask[:,(self.kspace.shape[2]-num_ACS)//2:(self.kspace.shape[2]+num_ACS)//2] = 1.0
         
         #self.kspace = self.kspace*self.mask[None,:,:,None]
