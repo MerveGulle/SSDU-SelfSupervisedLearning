@@ -47,7 +47,7 @@ mask = dataset.mask.to(device)
 ############## TEST CODE ###########################
 ####################################################
 denoiser = model.ResNet().to(device)
-denoiser.load_state_dict(torch.load('model_t__SSDU_100.pt'))
+denoiser.load_state_dict(torch.load('model_t__SSDU_200.pt'))
 denoiser.eval()
 for i, (x0, kspace, sens_map, xref, index) in enumerate(loaders['test_loader']):
     with torch.no_grad():
@@ -56,8 +56,6 @@ for i, (x0, kspace, sens_map, xref, index) in enumerate(loaders['test_loader']):
         kspace   = kspace.to(device)
         sens_map = sens_map.to(device)
         # Forward pass
-        #xref = xref/torch.max(torch.abs(x0))
-        #x0 = x0/torch.max(torch.abs(x0))
         xk = x0
         for k in range(params['K']):
             L, zk = denoiser(xk)
